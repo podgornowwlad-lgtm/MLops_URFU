@@ -1,0 +1,127 @@
+[project]
+name = "bank-churn"
+version = "0.1.0"
+description = "Прогноз оттока клиентов банка (Kaggle Playground S4E1): обучение и инференс в production-формате"
+readme = "README.md"
+requires-python = ">=3.11,<3.14"
+dependencies = [
+    "numpy (>=1.26,<3.0)",
+    "pandas (>=2.2,<3.0)",
+    "scikit-learn (>=1.5,<1.8)",
+    "catboost (>=1.2.7,<2.0)",
+    "optuna (>=4.0,<5.0)",
+    "joblib (>=1.4,<2.0)",
+    "pyyaml (>=6.0,<7.0)",
+    "pydantic (>=2.7,<3.0)",
+    "pydantic-settings (>=2.3,<3.0)",
+    "typer (>=0.12,<1.0)",
+]
+
+[project.scripts]
+bank-churn = "bank_churn.cli:app"
+
+[tool.poetry]
+packages = [{ include = "bank_churn", from = "src" }]
+
+# --- dev: линтеры, форматтеры, тесты, git-хуки, таск-раннер --------------------------
+[tool.poetry.group.dev.dependencies]
+black = "^25.1"
+isort = "^6.0"
+flake8 = "^7.2"
+flake8-pyproject = "^1.2"
+flake8-bugbear = "^24.12"
+pep8-naming = "^0.15"
+mypy = "^1.15"
+pandas-stubs = "^2.2"
+types-pyyaml = "^6.0"
+bandit = { version = "^1.8", extras = ["toml"] }
+pytest = "^8.3"
+pytest-cov = "^6.0"
+pre-commit = "^4.2"
+nbstripout = "^0.8"
+poethepoet = "^0.34"
+
+# --- notebook: только для исследований, в прод-окружение и Docker не попадает -------
+[tool.poetry.group.notebook]
+optional = true
+
+[tool.poetry.group.notebook.dependencies]
+jupyterlab = "^4.3"
+matplotlib = "^3.9"
+seaborn = "^0.13"
+phik = "^0.12"
+shap = "^0.47"
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+# =====================================================================================
+# Таски: `poetry run poe <task>` (кроссплатформенная замена Makefile)
+# =====================================================================================
+[tool.poe.tasks]
+hooks = { cmd = "pre-commit install", help = "Установить git-хуки (pre-commit + pre-push)" }
+format = { sequence = ["isort .", "black ."], default_item_type = "cmd", help = "Отформатировать код" }
+lint = { cmd = "pre-commit run --all-files", help = "Прогнать все pre-commit хуки" }
+typecheck = { cmd = "mypy", help = "Проверка типов" }
+security = { cmd = "bandit -c pyproject.toml -r src", help = "Статический анализ безопасности" }
+test = { cmd = "pytest", help = "Все тесты с покрытием" }
+test-unit = { cmd = "pytest -m 'not integration' --no-cov", help = "Только быстрые unit-тесты" }
+compare = { cmd = "bank-churn compare", help = "Сравнить модели-кандидаты" }
+train = { cmd = "bank-churn train", help = "Обучить финальную модель" }
+predict = { cmd = "bank-churn predict", help = "Скоринг CSV: poe predict data/raw/test.csv" }
+check = { sequence = ["lint", "test"], help = "Всё, что проверяет CI" }
+
+# =====================================================================================
+# Инструменты качества кода
+# =====================================================================================
+[tool.black]
+line-length = 100
+target-version = ["py311", "py312", "py313"]
+
+[tool.isort]
+profile = "black"
+line_length = 100
+known_first_party = ["bank_churn"]
+
+[tool.flake8]
+# Читается через плагин flake8-pyproject.
+max-line-length = 100
+max-complexity = 8
+select = ["E", "F", "W", "C90", "B", "N"]
+# E203/W503 конфликтуют с black.
+extend-ignore = ["E203", "W503"]
+exclude = [".git", ".venv", "__pycache__", "build", "dist", "notebooks"]
+
+[tool.mypy]
+python_version = "3.12"
+files = ["src", "tests"]
+plugins = ["pydantic.mypy"]
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+no_implicit_optional = true
+strict_equality = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+
+[[tool.mypy.overrides]]
+module = ["sklearn.*", "catboost.*", "joblib.*"]
+ignore_missing_imports = true
+
+[tool.bandit]
+exclude_dirs = ["tests", ".venv"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra --strict-markers --cov=bank_churn --cov-report=term-missing"
+markers = ["integration: end-to-end тесты (обучение модели на синтетике, медленнее unit)"]
+
+[tool.coverage.run]
+source = ["bank_churn"]
+branch = true
+
+[tool.coverage.report]
+fail_under = 85
+skip_covered = true
+exclude_also = ["if __name__ == .__main__.:"]

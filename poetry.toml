@@ -1,0 +1,8 @@
+# Локальные настройки Poetry для этого репозитория (коммитятся в git).
+[virtualenvs]
+# Окружение создаётся в ./.venv — VS Code (.vscode/settings.json), pre-commit и
+# poe находят интерпретатор без ручной настройки. Сама папка .venv в .gitignore:
+# в git лежат только pyproject.toml + poetry.lock, по ним окружение воссоздаётся.
+in-project = true
+# Если активен другой venv, Poetry всё равно создаст свой в ./.venv.
+create = true
